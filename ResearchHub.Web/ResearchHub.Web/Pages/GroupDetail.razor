@@ -1,0 +1,78 @@
+@page "/groups/{GroupId:int}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject ApiClient Api
+
+<PageTitle>Group - Research Hub</PageTitle>
+
+@if (_group == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <h1>@_group.GroupName</h1>
+    <p class="text-muted">Invite code: <strong>@_group.GroupCode</strong></p>
+
+    <h4 class="mt-4">Papers in group</h4>
+    @if (_papers.Count == 0)
+    {
+        <p class="text-muted">No papers yet. Add papers from search results to this group via the API.</p>
+    }
+    else
+    {
+        <ul class="list-group mb-4">
+            @foreach (var p in _papers)
+            {
+                <li class="list-group-item">
+                    <a href="papers/@p.PaperId">@p.Title</a>
+                    <small class="text-muted d-block">@p.Authors · Tags: @(p.Tags ?? "none")</small>
+                </li>
+            }
+        </ul>
+    }
+
+    <h4>Add note</h4>
+    <EditForm Model="_note" OnValidSubmit="AddNoteAsync" class="mb-4">
+        <InputNumber @bind-Value="_note.PaperId" class="form-control mb-2" placeholder="Paper ID" />
+        <InputTextArea @bind-Value="_note.NoteText" class="form-control mb-2" rows="3" />
+        <button type="submit" class="btn btn-primary">Save note</button>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int GroupId { get; set; }
+
+    private Models.GroupDto? _group;
+    private List<GroupPaperView> _papers = new();
+    private readonly NoteForm _note = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        _group = await Api.GetAsync<Models.GroupDto>($"groups/{GroupId}");
+        _papers = await Api.GetAsync<List<GroupPaperView>>($"groups/{GroupId}/papers") ?? new();
+        _note.GroupId = GroupId;
+    }
+
+    private async Task AddNoteAsync()
+    {
+        _note.GroupId = GroupId;
+        await Api.PostAsync("notes", _note);
+        _note.NoteText = "";
+    }
+
+    private class GroupPaperView
+    {
+        public int PaperId { get; set; }
+        public string Title { get; set; } = "";
+        public string? Authors { get; set; }
+        public string? Tags { get; set; }
+    }
+
+    private class NoteForm
+    {
+        public int PaperId { get; set; }
+        public int? GroupId { get; set; }
+        public string NoteText { get; set; } = "";
+    }
+}

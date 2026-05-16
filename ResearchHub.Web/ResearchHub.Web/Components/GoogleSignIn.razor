@@ -1,0 +1,90 @@
+@inject IJSRuntime JS
+@inject AppSettings Settings
+@inject AuthService AuthService
+@inject NavigationManager Navigation
+@implements IDisposable
+
+@if (string.IsNullOrWhiteSpace(Settings.GoogleClientId))
+{
+    <div class="alert alert-warning text-start">
+        <strong>Google Client ID not loaded</strong>
+        <p class="mb-0 mt-2">Add <code>Google__ClientId=your-id.apps.googleusercontent.com</code> to <code>.env</code> at the repo root, then restart this app.</p>
+        <p class="mb-0 mt-2 small">Or test login at <a href="http://localhost:5291/google_login_test.html" target="_blank">API login test page</a> (API must be running).</p>
+    </div>
+}
+else
+{
+    @* Same markup as working google_login_test.html on the API *@
+    <div id="g_id_onload"
+         data-client_id="@Settings.GoogleClientId"
+         data-callback="researchHubGoogle.handleCredential"
+         data-auto_prompt="false">
+    </div>
+    <div class="g_id_signin d-flex justify-content-center my-2"
+         data-type="standard"
+         data-size="large"
+         data-theme="outline"
+         data-text="sign_in_with"
+         data-shape="rectangular"
+         data-logo_alignment="left">
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(_initError))
+{
+    <div class="alert alert-warning mt-2">@_initError</div>
+}
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-danger mt-3">@_error</div>
+}
+
+@code {
+    private DotNetObjectReference<GoogleSignIn>? _dotNetRef;
+    private string? _error;
+    private string? _initError;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (string.IsNullOrWhiteSpace(Settings.GoogleClientId))
+            return;
+
+        _dotNetRef ??= DotNetObjectReference.Create(this);
+        await JS.InvokeVoidAsync("researchHubGoogle.setDotNetRef", _dotNetRef);
+
+        try
+        {
+            await JS.InvokeVoidAsync("researchHubGoogle.ensureRendered", Settings.GoogleClientId);
+        }
+        catch (Exception ex)
+        {
+            _initError = ex.Message;
+            StateHasChanged();
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnGoogleCredential(string credential)
+    {
+        _error = null;
+        StateHasChanged();
+
+        try
+        {
+            var ok = await AuthService.LoginWithGoogleAsync(credential);
+            if (ok)
+                Navigation.NavigateTo("/", forceLoad: true);
+            else
+                _error = "Login failed. Start the API (http://localhost:5291) and ensure the Google Client ID matches in .env and Google Cloud Console.";
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+
+        StateHasChanged();
+    }
+
+    public void Dispose() => _dotNetRef?.Dispose();
+}

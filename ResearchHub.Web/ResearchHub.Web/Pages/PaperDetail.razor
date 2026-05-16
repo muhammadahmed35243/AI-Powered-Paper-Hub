@@ -1,0 +1,99 @@
+@page "/papers/{PaperId:int}"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Paper - Research Hub</PageTitle>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_paper == null)
+{
+    <p>Paper not found.</p>
+}
+else
+{
+    <h1>@_paper.Title</h1>
+    <p class="text-muted">@_paper.Authors · @_paper.PublicationYear · @_paper.Source</p>
+    @if (!string.IsNullOrEmpty(_paper.Url))
+    {
+        <p><a href="@_paper.Url" target="_blank" rel="noopener">Open full paper</a></p>
+    }
+    <h4>Abstract</h4>
+    <p>@_paper.Abstract</p>
+
+    <div class="d-flex gap-2 mb-4">
+        <button class="btn btn-primary" @onclick="LoadSummaryAsync" disabled="_summaryLoading">
+            @(_summaryLoading ? "Generating..." : "AI Summary")
+        </button>
+        <button class="btn btn-outline-secondary" @onclick="BookmarkAsync">Bookmark</button>
+    </div>
+
+    @if (_summary != null)
+    {
+        <div class="card">
+            <div class="card-body">
+                <h4>AI Summary</h4>
+                <p>@_summary.SummaryText</p>
+                @if (!string.IsNullOrEmpty(_summary.KeyFindings))
+                {
+                    <h5>Key findings</h5>
+                    <pre class="bg-light p-2">@_summary.KeyFindings</pre>
+                }
+                @if (!string.IsNullOrEmpty(_summary.Methodology))
+                {
+                    <h5>Methodology</h5>
+                    <p>@_summary.Methodology</p>
+                }
+            </div>
+        </div>
+    }
+
+    @if (!string.IsNullOrEmpty(_error))
+    {
+        <div class="alert alert-warning mt-3">@_error</div>
+    }
+}
+
+@code {
+    [Parameter] public int PaperId { get; set; }
+
+    private Models.PaperDto? _paper;
+    private Models.PaperSummaryDto? _summary;
+    private bool _loading = true;
+    private bool _summaryLoading;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _paper = await Api.GetAsync<Models.PaperDto>($"papers/{PaperId}");
+        }
+        catch { }
+        _loading = false;
+    }
+
+    private async Task LoadSummaryAsync()
+    {
+        _summaryLoading = true;
+        _error = null;
+        try
+        {
+            _summary = await Api.GetAsync<Models.PaperSummaryDto>($"papers/{PaperId}/summary");
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        _summaryLoading = false;
+    }
+
+    private async Task BookmarkAsync()
+    {
+        await Api.PostAsync($"papers/{PaperId}/bookmark", new { });
+    }
+}

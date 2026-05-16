@@ -1,7 +1,80 @@
 ﻿@page "/"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject ApiClient Api
 
-<PageTitle>Home</PageTitle>
+<PageTitle>Dashboard - Research Hub</PageTitle>
 
-<h1>Hello, world!</h1>
+<h1>Dashboard</h1>
+<p class="text-muted">Welcome to your research hub.</p>
 
-Welcome to your new app.
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <div class="row g-3">
+        <div class="col-md-4">
+            <div class="card border-primary">
+                <div class="card-body">
+                    <h5 class="card-title">Search papers</h5>
+                    <p class="card-text">Find academic papers via Google Scholar.</p>
+                    <a href="search" class="btn btn-primary">Search</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-success">
+                <div class="card-body">
+                    <h5 class="card-title">Research groups</h5>
+                    <p class="card-text">Collaborate with your team.</p>
+                    <a href="groups" class="btn btn-success">Groups</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card border-info">
+                <div class="card-body">
+                    <h5 class="card-title">Recommendations</h5>
+                    <p class="card-text">Papers picked for your interests.</p>
+                    <a href="recommendations" class="btn btn-info text-white">View feed</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (_profile != null)
+    {
+        <div class="mt-4">
+            <h4>Your profile</h4>
+            <p><strong>@_profile.Name</strong> (@_profile.Email)</p>
+            @if (!string.IsNullOrEmpty(_profile.ResearchInterests))
+            {
+                <p>Interests: @_profile.ResearchInterests</p>
+            }
+        </div>
+    }
+}
+
+@code {
+    private bool _loading = true;
+    private ProfileView? _profile;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _profile = await Api.GetAsync<ProfileView>("auth/user-profile");
+        }
+        catch { /* ignore */ }
+        _loading = false;
+    }
+
+    private class ProfileView
+    {
+        public string Name { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string? ResearchInterests { get; set; }
+    }
+}

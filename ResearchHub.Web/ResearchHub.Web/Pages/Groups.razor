@@ -1,0 +1,108 @@
+@page "/groups"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject ApiClient Api
+
+<PageTitle>Groups - Research Hub</PageTitle>
+
+<h1>Research groups</h1>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <h4>Create group</h4>
+        <EditForm Model="_create" OnValidSubmit="CreateGroupAsync" class="row g-2">
+            <div class="col-12">
+                <InputText @bind-Value="_create.GroupName" class="form-control" placeholder="Group name" />
+            </div>
+            <div class="col-12">
+                <InputTextArea @bind-Value="_create.Description" class="form-control" placeholder="Description" rows="2" />
+            </div>
+            <div class="col-12">
+                <button type="submit" class="btn btn-success">Create</button>
+            </div>
+        </EditForm>
+    </div>
+    <div class="col-md-6">
+        <h4>Join with code</h4>
+        <EditForm Model="_join" OnValidSubmit="JoinGroupAsync" class="row g-2">
+            <div class="col-8">
+                <InputText @bind-Value="_join.GroupCode" class="form-control" placeholder="Group code" />
+            </div>
+            <div class="col-4">
+                <button type="submit" class="btn btn-primary w-100">Join</button>
+            </div>
+        </EditForm>
+    </div>
+</div>
+
+@if (!string.IsNullOrEmpty(_message))
+{
+    <div class="alert alert-info">@_message</div>
+}
+
+@if (_groups.Count == 0)
+{
+    <p class="text-muted">No groups yet. Create one or join with a code.</p>
+}
+else
+{
+    <div class="list-group">
+        @foreach (var g in _groups)
+        {
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h5>@g.GroupName</h5>
+                        <p class="mb-1 text-muted">@g.Description</p>
+                        <small>Code: <strong>@g.GroupCode</strong> · @g.MemberCount members · @g.PaperCount papers</small>
+                    </div>
+                    <a class="btn btn-sm btn-outline-primary align-self-center" href="groups/@g.GroupId">Open</a>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private List<Models.GroupDto> _groups = new();
+    private readonly CreateForm _create = new();
+    private readonly JoinForm _join = new();
+    private string? _message;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        _groups = await Api.GetAsync<List<Models.GroupDto>>("groups") ?? new();
+    }
+
+    private async Task CreateGroupAsync()
+    {
+        var res = await Api.PostAsync("groups", _create);
+        if (res.IsSuccessStatusCode)
+        {
+            _message = "Group created.";
+            _create.GroupName = "";
+            _create.Description = "";
+            await LoadAsync();
+        }
+    }
+
+    private async Task JoinGroupAsync()
+    {
+        var res = await Api.PostAsync("groups/join", _join);
+        _message = res.IsSuccessStatusCode ? "Joined group." : "Could not join. Check the code.";
+        if (res.IsSuccessStatusCode) await LoadAsync();
+    }
+
+    private class CreateForm
+    {
+        public string GroupName { get; set; } = "";
+        public string? Description { get; set; }
+    }
+
+    private class JoinForm
+    {
+        public string GroupCode { get; set; } = "";
+    }
+}

@@ -1,0 +1,42 @@
+@page "/recommendations"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject ApiClient Api
+
+<PageTitle>Recommendations - Research Hub</PageTitle>
+
+<h1>Recommended for you</h1>
+<p class="text-muted">Based on your searches and interests.</p>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_items.Count == 0)
+{
+    <p>Search for papers first to build your interest profile.</p>
+}
+else
+{
+    @foreach (var item in _items)
+    {
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5><a href="papers/@item.PaperId">@item.Title</a></h5>
+                <p class="text-muted">@item.Authors · @item.PublicationYear</p>
+                <p class="fst-italic">@item.Reason</p>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private List<Models.RecommendationDto> _items = new();
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _items = await Api.GetAsync<List<Models.RecommendationDto>>("recommendations") ?? new();
+        _loading = false;
+    }
+}

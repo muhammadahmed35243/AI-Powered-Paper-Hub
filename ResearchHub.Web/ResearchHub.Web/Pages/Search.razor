@@ -1,0 +1,91 @@
+@page "/search"
+@using Microsoft.AspNetCore.Authorization
+@attribute [Authorize]
+@inject ApiClient Api
+@inject NavigationManager Navigation
+
+<PageTitle>Search - Research Hub</PageTitle>
+
+<h1>Search papers</h1>
+
+<EditForm Model="_form" OnValidSubmit="SearchAsync" class="row g-2 mb-4">
+    <div class="col-md-6">
+        <InputText @bind-Value="_form.Query" class="form-control" placeholder="e.g. machine learning healthcare" />
+    </div>
+    <div class="col-md-2">
+        <InputText @bind-Value="_form.Field" class="form-control" placeholder="Field (optional)" />
+    </div>
+    <div class="col-md-2">
+        <InputNumber @bind-Value="_form.YearFrom" class="form-control" placeholder="From year" />
+    </div>
+    <div class="col-md-2">
+        <button type="submit" class="btn btn-primary w-100" disabled="_searching">@(_searching ? "Searching..." : "Search")</button>
+    </div>
+</EditForm>
+
+@if (!string.IsNullOrEmpty(_error))
+{
+    <div class="alert alert-warning">@_error</div>
+}
+
+@if (_results.Count > 0)
+{
+    <p class="text-muted">@_total results</p>
+    @foreach (var paper in _results)
+    {
+        <div class="card mb-3">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <a href="papers/@paper.PaperId">@paper.Title</a>
+                </h5>
+                <p class="card-subtitle text-muted">@paper.Authors · @paper.PublicationYear · Citations: @paper.CitationCount</p>
+                <p class="card-text">@(paper.Abstract?.Length > 300 ? paper.Abstract[..300] + "..." : paper.Abstract)</p>
+                <button class="btn btn-sm btn-outline-secondary" @onclick="() => BookmarkAsync(paper.PaperId)">Bookmark</button>
+            </div>
+        </div>
+    }
+}
+
+@code {
+    private readonly SearchForm _form = new();
+    private List<Models.PaperDto> _results = new();
+    private int _total;
+    private bool _searching;
+    private string? _error;
+
+    private async Task SearchAsync()
+    {
+        _searching = true;
+        _error = null;
+        _results.Clear();
+        try
+        {
+            var url = $"papers/search?query={Uri.EscapeDataString(_form.Query)}";
+            if (!string.IsNullOrWhiteSpace(_form.Field)) url += $"&field={Uri.EscapeDataString(_form.Field)}";
+            if (_form.YearFrom.HasValue) url += $"&year_from={_form.YearFrom}";
+            var response = await Api.GetAsync<Models.SearchResponse>(url);
+            if (response != null)
+            {
+                _results = response.Results;
+                _total = response.Total;
+            }
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+        _searching = false;
+    }
+
+    private async Task BookmarkAsync(int paperId)
+    {
+        await Api.PostAsync($"papers/{paperId}/bookmark", new { });
+    }
+
+    private class SearchForm
+    {
+        public string Query { get; set; } = "";
+        public string? Field { get; set; }
+        public int? YearFrom { get; set; }
+    }
+}
